@@ -1,0 +1,19 @@
+== OpenShift S2I Builder for Java using Maven
+This Source-to-Image Builder let's you build applications that are usually built with maven.
+
+== BUILD ENV Options
+
+* MAVEN_ARGS: maven cli command line arguments to use. Defaults to (.....)
+* MAVEN_ARGS_APPEND: maven arguments to append to current default arguments
+* MAVEN_SETTINGS: specific mave settings file to add to MAVEN_ARGS. If specified will always add to MAVEN_ARGS
+* ARTIFACT_DIR: directory where the maven build will look for the built artifacts. Default: target/
+* AS_IS_DIRS: directories list that will be copied into the /output from the source code repository without any modification
+
+== Generated artifacts
+Output artifact will be left in __/output/__
+
+Also, there will be a copy of the original repository's __as-is__ directory. If there's files you want to copy from the
+source github repository into the final image, you can place them into the a directory called __as-is__ and this directory will be copied. 
+
+== Samples
+There is a lot of example SpringBoot applications https://github.com/spring-projects/spring-boot/tree/master/spring-boot-samples[here]

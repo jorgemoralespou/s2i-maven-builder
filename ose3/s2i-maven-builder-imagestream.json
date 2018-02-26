@@ -1,0 +1,23 @@
+{
+   "kind": "ImageStream",
+   "apiVersion": "v1",
+   "metadata": {
+      "name": "s2i-java"
+   },
+   "spec": {
+      "dockerImageRepository": "jorgemoralespou/s2i-java",
+      "tags": [
+         {
+            "name": "latest",
+            "annotations": {
+               "description": "Apache Maven 3 S2I builder image",
+               "iconClass": "icon-java",
+               "tags": "builder,java,maven",
+               "supports": "java:8,maven:3",
+               "sampleRepo": "https://github.com/jorgemoralespou/springboot-sample-app.git",
+               "version": "1.0"
+            }
+         }
+      ]
+   }
+}

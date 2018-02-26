@@ -1,0 +1,114 @@
+#!/bin/bash
+
+# restore maven dependencies downloaded in a previous build,
+# so they do not have to be downloaded again.
+# /opt/s2i/destination/artifacts will only be present in the incremental build scenario
+# in which the target image name is an existing docker image which contains
+# dependencies from a prior build execution.
+function restore_saved_artifacts() {
+  if [ "$(ls -A $DESTINATION/artifacts/ 2>/dev/null)" ]; then
+    echo -n "Restoring saved artifacts from prior build..."
+    mv $DESTINATION/artifacts/.m2/repository $HOME/.m2
+  fi
+}
+
+# insert settings for HTTP proxy into settings.xml if supplied
+# Args:
+#  1: settings file
+#
+function configure_proxy() {
+  local _SETTINGS=${1:-$HOME/.m2/settings-s2i.xml}  
+  local xml
+
+  if [ -n "$HTTP_PROXY_HOST" -a -n "$HTTP_PROXY_PORT" ]; then
+    xml="<proxy>\
+         <id>genproxy</id>\
+         <active>true</active>\
+         <protocol>http</protocol>\
+         <host>$HTTP_PROXY_HOST</host>\
+         <port>$HTTP_PROXY_PORT</port>"
+    if [ -n "$HTTP_PROXY_USERNAME" -a -n "$HTTP_PROXY_PASSWORD" ]; then
+      xml="$xml\
+         <username>$HTTP_PROXY_USERNAME</username>\
+         <password>$HTTP_PROXY_PASSWORD</password>"
+    fi
+    if [ -n "$HTTP_PROXY_NONPROXYHOSTS" ]; then
+      xml="$xml\
+         <nonProxyHosts>$HTTP_PROXY_NONPROXYHOSTS</nonProxyHosts>"
+    fi
+  xml="$xml\
+       </proxy>"
+    sed -i "s|<!-- ### configured http proxy ### -->|$xml|"  $_SETTINGS
+  fi
+}
+
+# insert settings for mirrors/repository managers into settings.xml if supplied
+# Args:
+#  1: settings file
+#
+function configure_mirrors() {
+  local _SETTINGS=${1:-$HOME/.m2/settings-s2i.xml}
+  local xml
+
+  if [ -n "$MAVEN_MIRROR_URL" ]; then
+    xml="    <mirror>\
+      <id>mirror.default</id>\
+      <url>$MAVEN_MIRROR_URL</url>\
+      <mirrorOf>external:*</mirrorOf>\
+    </mirror>"
+    sed -i "s|<!-- ### configured mirrors ### -->|$xml|" $_SETTINGS
+  fi
+}
+
+
+# Args:
+#  1: settings file
+#
+function configure_profiles() {
+  local _SETTINGS=${1:-$HOME/.m2/settings-s2i.xml}
+  local xml
+
+  # TODO: Concatenate profiles and then sed the profiles into the settings.xml file
+  sed -i "s|<!-- ### additional profiles ### -->|$xml|"  $_SETTINGS
+}
+
+function move_artifacts() {
+  dir=$1
+  types=
+  shift
+  while [ $# -gt 0 ]; do
+    types="$types;$1"
+    shift
+  done
+
+  for d in $(echo $dir | tr "," "\n")
+  do
+    shift
+    for t in $(echo $types | tr ";" "\n")
+    do
+      echo "Moving all $t artifacts from $LOCAL_SOURCE_DIR/$d directory into $OUTPUT for later deployment..."
+      chgrp -fR 0 $LOCAL_SOURCE_DIR/$d/*.$t
+      chmod -fR g+rw $LOCAL_SOURCE_DIR/$d/*.$t
+      mv -v $LOCAL_SOURCE_DIR/$d/*.$t $OUTPUT 2> /dev/null
+    done
+  done
+}
+
+function copy_as_is_dirs() {
+  local AS_IS_DIRS=${AS_IS_DIRS:-"as-is"}
+  echo "AS_IS_DIRS: $AS_IS_DIRS"
+#  IFS=';'; arr_dirs=($AS_IS_DIRS); unset IFS
+  arr_dirs=(${AS_IS_DIRS//;/ })
+  # Split $_COPY_AS_IS_DIRS by comma or semicolon (delimiter) and trim empty spaces
+  echo "_as-is-dirs: $arr_dirs"
+  for dir in "$arr_dirs"
+  do
+    if [ -d $LOCAL_SOURCE_DIR/${dir} ]; then
+      echo "Copying additional configuration from project ${dir} as it is..."
+      mkdir -p $OUTPUT/${dir}
+      cp -r $LOCAL_SOURCE_DIR/${dir}/* $OUTPUT/${dir}
+      chgrp -R 0 $OUTPUT/${dir}
+      chmod -R g+rw $OUTPUT/${dir}
+    fi
+  done
+}
